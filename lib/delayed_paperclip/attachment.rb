@@ -43,6 +43,10 @@ module DelayedPaperclip
         self.job_is_processing = true
         self.post_processing = true
         reprocess!(*delayed_options[:only_process])
+      rescue NoMethodError => e
+        # this occurs when attempting to update the file size in the paperclip gem
+        # paperclip/attachment.rb:109 Attachment#assign
+      ensure
         self.job_is_processing = false
       end
 
