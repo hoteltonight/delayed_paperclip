@@ -1,4 +1,5 @@
 require 'resque'
+require 'resque-retry'
 
 module DelayedPaperclip
   module Jobs
@@ -12,9 +13,6 @@ module DelayedPaperclip
       end
 
       def self.perform(instance_klass, instance_id, attachment_name)
-        if retry_attempt <= 1
-          raise "Testing here"
-        end
         DelayedPaperclip.process_job(instance_klass, instance_id, attachment_name)
       end
     end
