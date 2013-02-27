@@ -5,3 +5,4 @@ public/
 Gemfile.lock
 *.gem
 ./gemfiles/rails*.lock
+.idea/

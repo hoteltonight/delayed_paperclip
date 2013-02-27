@@ -1,11 +1,10 @@
-source "http://rubygems.org"
+source 'http://rubygems.org'
 
 gemspec
 
-gem "appraisal"
-
-gem "json",         :platforms => :ruby_18
-
-gem "delayed_job_active_record", :require => false
-
+gem 'appraisal'
+gem 'delayed_job_active_record', :require => false
+gem 'json', :platforms => :ruby_18
+gem 'paperclip', '~>2.7'
 gem 'rails'
+gem 'resque-retry', '~> 1.0.0'
