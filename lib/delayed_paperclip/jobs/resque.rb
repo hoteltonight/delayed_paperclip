@@ -3,7 +3,7 @@ require 'resque'
 module DelayedPaperclip
   module Jobs
     class Resque
-      extend Resque::Plugins::ExponentialBackoff
+      extend ::Resque::Plugins::ExponentialBackoff
       @backoff_strategy = [0, 15, 30, 60]
       @queue = :paperclip
 
