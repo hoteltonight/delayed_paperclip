@@ -56,7 +56,6 @@ module DelayedPaperclip
 
       if options[:retry_strategy].present? && options[:retry_strategy].is_a?(Array)
         ::DelayedPaperclip::Jobs::Resque.extend(::Resque::Plugins::ExponentialBackoff)
-        ::DelayedPaperclip::Jobs::Resque.instance_variable_set("@queue", :paperclip)
         ::DelayedPaperclip::Jobs::Resque.instance_variable_set("@backoff_strategy", options[:retry_strategy])
       end
 

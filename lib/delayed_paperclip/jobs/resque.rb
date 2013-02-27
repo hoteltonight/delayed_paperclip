@@ -4,6 +4,8 @@ require 'resque-retry'
 module DelayedPaperclip
   module Jobs
     class Resque
+      @queue = :paperclip
+
       def self.enqueue_delayed_paperclip(instance_klass, instance_id, attachment_name)
         ::Resque.enqueue(self, instance_klass, instance_id, attachment_name)
       end
