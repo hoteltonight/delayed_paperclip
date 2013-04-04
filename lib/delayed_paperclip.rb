@@ -59,6 +59,10 @@ module DelayedPaperclip
         ::DelayedPaperclip::Jobs::Resque.instance_variable_set("@backoff_strategy", options[:retry_strategy])
       end
 
+      if options[:resque_queue].present?
+        ::DelayedPaperclip::Jobs::Resque.instance_variable_set("@queue", options[:resque_queue])
+      end
+
       if respond_to?(:after_commit)
         after_commit  :enqueue_delayed_processing
       else
