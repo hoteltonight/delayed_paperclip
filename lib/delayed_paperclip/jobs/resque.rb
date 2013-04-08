@@ -7,11 +7,13 @@ module DelayedPaperclip
       @queue = :paperclip
 
       def self.enqueue_delayed_paperclip(instance_klass, instance_id, attachment_name)
-        if instance_klass.to_s == "CustomerPhoto"
-          ::Resque.enqueue_to("customer_photo", self, instance_klass, instance_id, attachment_name)
-        else
-          ::Resque.enqueue(self, instance_klass, instance_id, attachment_name)
-        end
+        queue = case instance_klass
+                when "CustomerPhoto" then :customer_photo
+                else
+                  @queue
+                end
+
+        ::Resque.enqueue_to(queue, self, instance_klass, instance_id, attachment_name)
       end
 
       def self.perform(instance_klass, instance_id, attachment_name)
