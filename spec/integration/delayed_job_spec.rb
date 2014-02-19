@@ -1,16 +1,33 @@
-require 'test_helper'
-require 'base_delayed_paperclip_test'
+require 'spec_helper'
 require 'delayed_job'
 
 Delayed::Worker.backend = :active_record
 
-class DelayedPaperclipTest < Test::Unit::TestCase
-  include BaseDelayedPaperclipTest
+describe "Delayed Job" do
 
-  def setup
-    super
+  before :all do
     DelayedPaperclip.options[:background_job_class] = DelayedPaperclip::Jobs::DelayedJob
     build_delayed_jobs
+  end
+
+  let(:dummy) { Dummy.new(:image => File.open("#{ROOT}/spec/fixtures/12k.png")) }
+
+  describe "integration tests" do
+    include_examples "base usage"
+  end
+
+  describe "perform job" do
+    before :each do
+      DelayedPaperclip.options[:url_with_processing] = true
+      reset_dummy
+    end
+
+    it "performs a job" do
+      dummy.image = File.open("#{ROOT}/spec/fixtures/12k.png")
+      Paperclip::Attachment.any_instance.expects(:reprocess!)
+      dummy.save!
+      Delayed::Job.last.payload_object.perform
+    end
   end
 
   def process_jobs
@@ -19,14 +36,6 @@ class DelayedPaperclipTest < Test::Unit::TestCase
 
   def jobs_count
     Delayed::Job.count
-  end
-
-  def test_perform_job
-    dummy = Dummy.new(:image => File.open("#{RAILS_ROOT}/test/fixtures/12k.png"))
-    dummy.image = File.open("#{RAILS_ROOT}/test/fixtures/12k.png")
-    Paperclip::Attachment.any_instance.expects(:reprocess!)
-    dummy.save!
-    Delayed::Job.last.payload_object.perform
   end
 
   def build_delayed_jobs
@@ -43,5 +52,4 @@ class DelayedPaperclipTest < Test::Unit::TestCase
       table.timestamps
     end
   end
-
 end
