@@ -2,8 +2,18 @@ require 'rubygems'
 require 'test/unit'
 require 'mocha/setup'
 require 'active_record'
+require 'active_record/version'
+require 'active_support'
+require 'active_support/core_ext'
 require 'logger'
 require 'sqlite3'
+
+begin
+  require 'pry'
+rescue LoadError
+  # Pry is not available, just ignore.
+end
+
 require 'paperclip/railtie'
 
 Paperclip::Railtie.insert
@@ -64,8 +74,10 @@ def reset_class(class_name, options)
   klass.class_eval do
     include Paperclip::Glue
 
-    has_attached_file  :image, options[:paperclip]
+    has_attached_file :image, options[:paperclip]
     options.delete(:paperclip)
+
+    validates_attachment :image, :content_type => { :content_type => "image/png" }
 
     process_in_background :image, options if options[:with_processed]
 

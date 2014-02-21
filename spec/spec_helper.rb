@@ -1,10 +1,18 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), "..", "lib"))
 
-require 'rails'
 require 'active_record'
+require 'active_record/version'
+require 'active_support'
+require 'active_support/core_ext'
 require 'rspec'
 require 'mocha/api'
+
+begin
+  require 'pry'
+rescue LoadError
+  # Pry is not available, just ignore.
+end
 
 require 'paperclip/railtie'
 Paperclip::Railtie.insert
@@ -36,7 +44,6 @@ Dir["./spec/integration/examples/*.rb"].sort.each {|f| require f}
 
 # Reset table and class with image_processing column or not
 def reset_dummy(options = {})
-
   options[:with_processed] = true unless options.key?(:with_processed)
   options[:processed_column] = options[:with_processed] unless options.has_key?(:processed_column)
   build_dummy_table(options.delete(:processed_column))
@@ -69,8 +76,10 @@ def reset_class(class_name, options)
   klass.class_eval do
     include Paperclip::Glue
 
-    has_attached_file  :image, options[:paperclip]
+    has_attached_file :image, options[:paperclip]
     options.delete(:paperclip)
+
+    validates_attachment :image, :content_type => { :content_type => "image/png" }
 
     process_in_background :image, options if options[:with_processed]
 
