@@ -10,13 +10,15 @@ module DelayedPaperclip
     def options
       @options ||= {
         :background_job_class => detect_background_task,
-        :url_with_processing  => true
+        :url_with_processing  => true,
+        :processing_image_url => nil
       }
     end
 
     def detect_background_task
       return DelayedPaperclip::Jobs::DelayedJob if defined? ::Delayed::Job
       return DelayedPaperclip::Jobs::Resque     if defined? ::Resque
+      return DelayedPaperclip::Jobs::Sidekiq    if defined? ::Sidekiq
     end
 
     def processor
@@ -28,7 +30,7 @@ module DelayedPaperclip
     end
 
     def process_job(instance_klass, instance_id, attachment_name)
-      instance_klass.constantize.find(instance_id).
+      instance_klass.constantize.unscoped.find(instance_id).
         send(attachment_name).
         process_delayed!
     end
@@ -36,22 +38,31 @@ module DelayedPaperclip
   end
 
   module Glue
-    def self.included base #:nodoc:
+    def self.included(base)
       base.extend(ClassMethods)
+      base.send :include, InstanceMethods
     end
   end
 
   module ClassMethods
 
     def process_in_background(name, options = {})
-      include InstanceMethods
+      # initialize as hash
+      paperclip_definitions[name][:delayed] = {}
 
-      attachment_definitions[name][:delayed] = {}
+      # Set Defaults
+      only_process_default = paperclip_definitions[name][:only_process]
+      only_process_default ||= []
       {
         :priority => 0,
-        :url_with_processing => DelayedPaperclip.options[:url_with_processing]
+        :only_process => only_process_default,
+        :url_with_processing => DelayedPaperclip.options[:url_with_processing],
+        :processing_image_url => options[:processing_image_url],
+        :queue => nil
       }.each do |option, default|
-        attachment_definitions[name][:delayed][option] = options.key?(option) ? options[option] : default
+
+        paperclip_definitions[name][:delayed][option] = options.key?(option) ? options[option] : default
+
       end
 
       if options[:retry_strategy].present? && options[:retry_strategy].is_a?(Array)
@@ -59,35 +70,45 @@ module DelayedPaperclip
         ::DelayedPaperclip::Jobs::Resque.instance_variable_set("@backoff_strategy", options[:retry_strategy])
       end
 
+      # Sets callback
       if respond_to?(:after_commit)
         after_commit  :enqueue_delayed_processing
       else
-        after_save  :enqueue_delayed_processing
+        after_save    :enqueue_delayed_processing
+      end
+    end
+
+    def paperclip_definitions
+      @paperclip_definitions ||= if respond_to? :attachment_definitions
+        attachment_definitions
+      else
+        Paperclip::Tasks::Attachments.definitions_for(self)
       end
     end
   end
 
   module InstanceMethods
 
-    # setting each inididual NAME_processing to true, skipping the ActiveModel dirty setter
-    # Then immediately push the state to the database
-    def mark_enqueue_delayed_processing
-      unless @_enqued_for_processing_with_processing.blank? # catches nil and empy arrays
-        updates = @_enqued_for_processing_with_processing.collect{|n| "#{n}_processing = :true" }.join(", ")
-        updates = ActiveRecord::Base.send(:sanitize_sql_array, [updates, {:true => true}])
-        self.class.update_all(updates, "id = #{self.id}")
-      end
-    end
-
     # First mark processing
-    # then create
+    # then enqueue
     def enqueue_delayed_processing
       mark_enqueue_delayed_processing
+
       (@_enqued_for_processing || []).each do |name|
         enqueue_post_processing_for(name)
       end
       @_enqued_for_processing_with_processing = []
       @_enqued_for_processing = []
+    end
+
+    # setting each inididual NAME_processing to true, skipping the ActiveModel dirty setter
+    # Then immediately push the state to the database
+    def mark_enqueue_delayed_processing
+      unless @_enqued_for_processing_with_processing.blank? # catches nil and empty arrays
+        updates = @_enqued_for_processing_with_processing.collect{|n| "#{n}_processing = :true" }.join(", ")
+        updates = ActiveRecord::Base.send(:sanitize_sql_array, [updates, {:true => true}])
+        self.class.where(:id => self.id).update_all(updates)
+      end
     end
 
     def enqueue_post_processing_for name
@@ -100,6 +121,7 @@ module DelayedPaperclip
         @_enqued_for_processing_with_processing ||= []
         @_enqued_for_processing_with_processing << name
       end
+
       @_enqued_for_processing ||= []
       @_enqued_for_processing << name
     end
